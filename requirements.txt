@@ -1,0 +1,6 @@
+# Local tooling only — training runs in the Colab starter notebook
+certifi  # SSL certs for collect_reddit.py on python.org macOS installs
+# Stretch: deployed interface (app/app.py)
+gradio>=4.0
+transformers>=4.40
+torch>=2.1

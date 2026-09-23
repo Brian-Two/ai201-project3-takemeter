@@ -1,0 +1,12 @@
+# secrets — never commit your Groq key
+.env
+# large model weights (download from Colab, keep local or push to HF Hub)
+model/
+*.safetensors
+*.bin
+# python
+__pycache__/
+.venv/
+venv/
+.ipynb_checkpoints/
+.DS_Store

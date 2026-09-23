@@ -1,0 +1,9 @@
+{
+  "_comment": "Placeholder labels — replace with your own taxonomy (2–4 labels) once you've read 30–40 real posts. Keys are the labels; values are one-sentence definitions. Order = keyboard shortcut order in scripts/label.py.",
+  "subreddit": "nba",
+  "labels": {
+    "analysis": "TODO: one-sentence definition",
+    "hot_take": "TODO: one-sentence definition",
+    "reaction": "TODO: one-sentence definition"
+  }
+}
