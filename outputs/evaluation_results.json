@@ -1,0 +1,234 @@
+{
+  "test_size": 59,
+  "labels": [
+    "analysis",
+    "hot_take",
+    "reaction",
+    "banter"
+  ],
+  "finetuned": {
+    "model": "distilbert-base-uncased",
+    "config": {
+      "tag": "e8_lr3e-5_w",
+      "epochs": 8.0,
+      "lr": 3e-05,
+      "batch_size": 16,
+      "class_weights": true,
+      "best_val_macro_f1": 0.5295,
+      "best_val_accuracy": 0.5517
+    },
+    "labels": [
+      "analysis",
+      "hot_take",
+      "reaction",
+      "banter"
+    ],
+    "test_size": 59,
+    "accuracy": 0.6440677966101694,
+    "macro_f1": 0.5955965385161015,
+    "per_class": {
+      "analysis": {
+        "precision": 0.8181818181818182,
+        "recall": 0.9,
+        "f1-score": 0.8571428571428571,
+        "support": 10.0
+      },
+      "hot_take": {
+        "precision": 0.8,
+        "recall": 0.7142857142857143,
+        "f1-score": 0.7547169811320755,
+        "support": 28.0
+      },
+      "reaction": {
+        "precision": 0.16666666666666666,
+        "recall": 0.2857142857142857,
+        "f1-score": 0.21052631578947367,
+        "support": 7.0
+      },
+      "banter": {
+        "precision": 0.6363636363636364,
+        "recall": 0.5,
+        "f1-score": 0.56,
+        "support": 14.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        9,
+        1,
+        0,
+        0
+      ],
+      [
+        1,
+        20,
+        4,
+        3
+      ],
+      [
+        1,
+        3,
+        2,
+        1
+      ],
+      [
+        0,
+        1,
+        6,
+        7
+      ]
+    ]
+  },
+  "baseline": {
+    "model": "openai/gpt-oss-20b",
+    "test_size": 59,
+    "unparseable": 0,
+    "accuracy": 0.6271186440677966,
+    "macro_f1": 0.5654034690799397,
+    "per_class": {
+      "analysis": {
+        "precision": 0.5714285714285714,
+        "recall": 0.4,
+        "f1-score": 0.47058823529411764,
+        "support": 10.0
+      },
+      "hot_take": {
+        "precision": 0.6216216216216216,
+        "recall": 0.8214285714285714,
+        "f1-score": 0.7076923076923077,
+        "support": 28.0
+      },
+      "reaction": {
+        "precision": 0.6,
+        "recall": 0.42857142857142855,
+        "f1-score": 0.5,
+        "support": 7.0
+      },
+      "banter": {
+        "precision": 0.7,
+        "recall": 0.5,
+        "f1-score": 0.5833333333333334,
+        "support": 14.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        4,
+        6,
+        0,
+        0
+      ],
+      [
+        3,
+        23,
+        1,
+        1
+      ],
+      [
+        0,
+        2,
+        3,
+        2
+      ],
+      [
+        0,
+        6,
+        1,
+        7
+      ]
+    ],
+    "labels": [
+      "analysis",
+      "hot_take",
+      "reaction",
+      "banter"
+    ],
+    "system_prompt": "You classify comments from r/nba (the NBA subreddit) by what kind of discourse they are.\n\nLabels:\n- analysis: The post makes a basketball claim AND supports it with specific, checkable evidence (stats, concrete game events, tactical detail, or a historical comparison) that actually does the reasoning.\n- hot_take: The post confidently asserts an evaluative opinion about players, teams, or the league with no real support, or with support that is vague or decorative.\n- reaction: The post expresses an in-the-moment feeling (hype, frustration, disbelief, praise) about a specific play, game, or news item without making a broader claim that outlives the moment.\n- banter: Humor is the point: jokes, memes, puns, sarcasm, or riffs where any opinion is only implied and the post is written to be funny rather than to persuade.\n\nDecision rules for hard cases:\n- analysis vs hot_take: if the evidence would still support the claim with the opinion framing removed, and there is more than one piece of it or the one piece is load-bearing, it is analysis. A single cherry-picked stat or a vague gesture (\"look at his numbers\") is hot_take.\n- reaction vs hot_take: if the post makes a general evaluative claim about a player/team that someone could still argue with next week (washed, overrated, best ever, should be traded), it is hot_take even if emotional. If it only feels about what just happened, it is reaction.\n- banter vs anything: if the literal text is a joke or sarcasm and the opinion must be inferred, it is banter. If a sincere claim has a joke tacked on, label the sincere claim.\n- Mixed posts: label by the post's dominant purpose.\n\nRespond with exactly one word: analysis, hot_take, reaction, or banter. No punctuation, no explanation."
+  },
+  "majority_class_accuracy": 0.4745762711864407,
+  "calibration": [
+    {
+      "bin": "< 0.50",
+      "n": 29,
+      "accuracy": 0.414,
+      "mean_confidence": 0.437
+    },
+    {
+      "bin": "0.50\u20130.70",
+      "n": 21,
+      "accuracy": 0.857,
+      "mean_confidence": 0.58
+    },
+    {
+      "bin": "0.70\u20130.90",
+      "n": 9,
+      "accuracy": 0.889,
+      "mean_confidence": 0.792
+    }
+  ],
+  "ece": 0.1247,
+  "error_pairs": [
+    {
+      "true": "banter",
+      "pred": "reaction",
+      "count": 6
+    },
+    {
+      "true": "hot_take",
+      "pred": "reaction",
+      "count": 4
+    },
+    {
+      "true": "reaction",
+      "pred": "hot_take",
+      "count": 3
+    },
+    {
+      "true": "hot_take",
+      "pred": "banter",
+      "count": 3
+    },
+    {
+      "true": "hot_take",
+      "pred": "analysis",
+      "count": 1
+    },
+    {
+      "true": "reaction",
+      "pred": "analysis",
+      "count": 1
+    },
+    {
+      "true": "reaction",
+      "pred": "banter",
+      "count": 1
+    },
+    {
+      "true": "analysis",
+      "pred": "hot_take",
+      "count": 1
+    },
+    {
+      "true": "banter",
+      "pred": "hot_take",
+      "count": 1
+    }
+  ],
+  "accuracy_by_length": [
+    {
+      "bucket": "short (<80)",
+      "n": 20,
+      "accuracy": 0.45
+    },
+    {
+      "bucket": "medium (80\u2013200)",
+      "n": 24,
+      "accuracy": 0.625
+    },
+    {
+      "bucket": "long (>200)",
+      "n": 15,
+      "accuracy": 0.933
+    }
+  ]
+}

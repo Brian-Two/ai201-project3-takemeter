@@ -94,9 +94,19 @@ Other rules:
 
 ## 8. Stretch Feature Plans
 
-_(Updated before starting stretch work.)_
+_Updated after the core evaluation and before starting stretch work._
 
-- [ ] **Confidence calibration:** bin test-set predictions by max softmax probability (<0.5, 0.5–0.7, 0.7–0.9, ≥0.9) and report accuracy per bin; calibrated = accuracy rises with confidence.
-- [ ] **Error pattern analysis:** group fine-tuned errors by label pair and by post length (short < 80 chars vs. long) and test whether one pattern explains most errors.
-- [ ] **Deployed interface:** Gradio app (`app/app.py`) loading the fine-tuned model locally, showing label + per-class confidence.
-- [ ] Inter-annotator reliability: not planned — requires a second human annotator (could be added if a friend labels 30+ posts).
+Status going in: fine-tuned macro-F1 0.596 vs baseline 0.565; `reaction` F1 0.21. The stretch work is chosen to explain *why*, not just to add features.
+
+- [x] **Confidence calibration.** Bin test predictions by max softmax probability (<0.5, 0.5–0.7, 0.7–0.9, ≥0.9) and report accuracy and mean confidence per bin, plus expected calibration error. Hypothesis: class weights plus the early (epoch 4) checkpoint make the model *under*confident. Success = accuracy rises monotonically with confidence.
+- [x] **Error pattern analysis.** Group errors by (true → predicted) pair and by post length (<80 / 80–200 / >200 chars). Test four candidate patterns proposed by the AI (length, banter↔reaction, profanity, "lol" markers) and keep only those that hold up in the counts. Also check whether the length-filtered top-up batches created a length/label correlation in the training data.
+- [x] **Deployed interface.** Gradio app (`app/app.py`) loading `./model`, showing label and all four class probabilities, with built-in examples for the demo video.
+- [ ] **Inter-annotator reliability.** Not done: it needs a second human annotator. Plan if added: a friend labels 40 random posts from `data/splits/test.csv` blind, then report Cohen's kappa against the existing labels, with expected disagreement concentrated on reaction↔hot_take (rule B).
+
+## 9. Revisions After Collection (log)
+
+- **Data source:** Reddit's JSON endpoints return 403 for requests without a login, so collection uses the Arctic Shift archive of the same public comments.
+- **Skip rate:** 17.6%, not ~10%. Mostly user-vs-user insult chains in discussion threads.
+- **Imbalance:** after one top-up round, `analysis` is 17% and `reaction` 13% (<20%). Handled with class-weighted loss rather than a third collection round.
+- **Baseline model:** Groq retired `llama-4-scout-17b-16e-instruct`, so `openai/gpt-oss-20b` is used instead.
+- **Default hyperparameters (3 epochs) collapsed to the majority class** (val macro-F1 0.16). Configs were compared on validation only; the chosen one is 8 epochs, lr 3e-5, class weights, with the best checkpoint at epoch 4.
