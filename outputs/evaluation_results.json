@@ -1,5 +1,5 @@
 {
-  "test_size": 59,
+  "test_size": 57,
   "labels": [
     "analysis",
     "hot_take",
@@ -14,8 +14,8 @@
       "lr": 3e-05,
       "batch_size": 16,
       "class_weights": true,
-      "best_val_macro_f1": 0.5295,
-      "best_val_accuracy": 0.5517
+      "best_val_macro_f1": 0.581,
+      "best_val_accuracy": 0.625
     },
     "labels": [
       "analysis",
@@ -23,112 +23,112 @@
       "reaction",
       "banter"
     ],
-    "test_size": 59,
-    "accuracy": 0.6440677966101694,
-    "macro_f1": 0.5955965385161015,
+    "test_size": 57,
+    "accuracy": 0.5614035087719298,
+    "macro_f1": 0.5572242136910268,
     "per_class": {
       "analysis": {
-        "precision": 0.8181818181818182,
-        "recall": 0.9,
-        "f1-score": 0.8571428571428571,
-        "support": 10.0
+        "precision": 0.6666666666666666,
+        "recall": 0.7272727272727273,
+        "f1-score": 0.6956521739130435,
+        "support": 11.0
       },
       "hot_take": {
-        "precision": 0.8,
-        "recall": 0.7142857142857143,
-        "f1-score": 0.7547169811320755,
-        "support": 28.0
+        "precision": 0.6666666666666666,
+        "recall": 0.5384615384615384,
+        "f1-score": 0.5957446808510638,
+        "support": 26.0
       },
       "reaction": {
-        "precision": 0.16666666666666666,
-        "recall": 0.2857142857142857,
-        "f1-score": 0.21052631578947367,
-        "support": 7.0
+        "precision": 0.5,
+        "recall": 0.5,
+        "f1-score": 0.5,
+        "support": 6.0
       },
       "banter": {
-        "precision": 0.6363636363636364,
+        "precision": 0.3888888888888889,
         "recall": 0.5,
-        "f1-score": 0.56,
+        "f1-score": 0.4375,
         "support": 14.0
       }
     },
     "confusion_matrix": [
       [
-        9,
-        1,
+        8,
+        3,
         0,
         0
       ],
       [
-        1,
-        20,
-        4,
-        3
-      ],
-      [
-        1,
-        3,
         2,
-        1
+        14,
+        2,
+        8
       ],
       [
         0,
+        0,
+        3,
+        3
+      ],
+      [
+        2,
+        4,
         1,
-        6,
         7
       ]
     ]
   },
   "baseline": {
     "model": "openai/gpt-oss-20b",
-    "test_size": 59,
+    "test_size": 57,
     "unparseable": 0,
-    "accuracy": 0.6271186440677966,
-    "macro_f1": 0.5654034690799397,
+    "accuracy": 0.6842105263157895,
+    "macro_f1": 0.605072463768116,
     "per_class": {
       "analysis": {
-        "precision": 0.5714285714285714,
-        "recall": 0.4,
-        "f1-score": 0.47058823529411764,
-        "support": 10.0
+        "precision": 1.0,
+        "recall": 0.09090909090909091,
+        "f1-score": 0.16666666666666666,
+        "support": 11.0
       },
       "hot_take": {
-        "precision": 0.6216216216216216,
-        "recall": 0.8214285714285714,
-        "f1-score": 0.7076923076923077,
-        "support": 28.0
+        "precision": 0.6046511627906976,
+        "recall": 1.0,
+        "f1-score": 0.7536231884057971,
+        "support": 26.0
       },
       "reaction": {
-        "precision": 0.6,
-        "recall": 0.42857142857142855,
-        "f1-score": 0.5,
-        "support": 7.0
+        "precision": 0.8333333333333334,
+        "recall": 0.8333333333333334,
+        "f1-score": 0.8333333333333334,
+        "support": 6.0
       },
       "banter": {
-        "precision": 0.7,
+        "precision": 1.0,
         "recall": 0.5,
-        "f1-score": 0.5833333333333334,
+        "f1-score": 0.6666666666666666,
         "support": 14.0
       }
     },
     "confusion_matrix": [
       [
-        4,
-        6,
+        1,
+        10,
         0,
         0
       ],
       [
-        3,
-        23,
-        1,
-        1
+        0,
+        26,
+        0,
+        0
       ],
       [
         0,
-        2,
-        3,
-        2
+        1,
+        5,
+        0
       ],
       [
         0,
@@ -145,90 +145,85 @@
     ],
     "system_prompt": "You classify comments from r/nba (the NBA subreddit) by what kind of discourse they are.\n\nLabels:\n- analysis: The post makes a basketball claim AND supports it with specific, checkable evidence (stats, concrete game events, tactical detail, or a historical comparison) that actually does the reasoning.\n- hot_take: The post confidently asserts an evaluative opinion about players, teams, or the league with no real support, or with support that is vague or decorative.\n- reaction: The post expresses an in-the-moment feeling (hype, frustration, disbelief, praise) about a specific play, game, or news item without making a broader claim that outlives the moment.\n- banter: Humor is the point: jokes, memes, puns, sarcasm, or riffs where any opinion is only implied and the post is written to be funny rather than to persuade.\n\nDecision rules for hard cases:\n- analysis vs hot_take: if the evidence would still support the claim with the opinion framing removed, and there is more than one piece of it or the one piece is load-bearing, it is analysis. A single cherry-picked stat or a vague gesture (\"look at his numbers\") is hot_take.\n- reaction vs hot_take: if the post makes a general evaluative claim about a player/team that someone could still argue with next week (washed, overrated, best ever, should be traded), it is hot_take even if emotional. If it only feels about what just happened, it is reaction.\n- banter vs anything: if the literal text is a joke or sarcasm and the opinion must be inferred, it is banter. If a sincere claim has a joke tacked on, label the sincere claim.\n- Mixed posts: label by the post's dominant purpose.\n\nRespond with exactly one word: analysis, hot_take, reaction, or banter. No punctuation, no explanation."
   },
-  "majority_class_accuracy": 0.4745762711864407,
+  "majority_class_accuracy": 0.45614035087719296,
   "calibration": [
     {
       "bin": "< 0.50",
-      "n": 29,
-      "accuracy": 0.414,
-      "mean_confidence": 0.437
+      "n": 30,
+      "accuracy": 0.467,
+      "mean_confidence": 0.415
     },
     {
       "bin": "0.50\u20130.70",
-      "n": 21,
-      "accuracy": 0.857,
-      "mean_confidence": 0.58
+      "n": 24,
+      "accuracy": 0.625,
+      "mean_confidence": 0.587
     },
     {
       "bin": "0.70\u20130.90",
-      "n": 9,
-      "accuracy": 0.889,
-      "mean_confidence": 0.792
+      "n": 3,
+      "accuracy": 1.0,
+      "mean_confidence": 0.76
     }
   ],
-  "ece": 0.1247,
+  "ece": 0.056,
   "error_pairs": [
     {
+      "true": "hot_take",
+      "pred": "banter",
+      "count": 8
+    },
+    {
       "true": "banter",
-      "pred": "reaction",
-      "count": 6
-    },
-    {
-      "true": "hot_take",
-      "pred": "reaction",
-      "count": 4
-    },
-    {
-      "true": "reaction",
       "pred": "hot_take",
-      "count": 3
-    },
-    {
-      "true": "hot_take",
-      "pred": "banter",
-      "count": 3
-    },
-    {
-      "true": "hot_take",
-      "pred": "analysis",
-      "count": 1
-    },
-    {
-      "true": "reaction",
-      "pred": "analysis",
-      "count": 1
-    },
-    {
-      "true": "reaction",
-      "pred": "banter",
-      "count": 1
+      "count": 4
     },
     {
       "true": "analysis",
       "pred": "hot_take",
-      "count": 1
+      "count": 3
+    },
+    {
+      "true": "reaction",
+      "pred": "banter",
+      "count": 3
+    },
+    {
+      "true": "hot_take",
+      "pred": "analysis",
+      "count": 2
+    },
+    {
+      "true": "hot_take",
+      "pred": "reaction",
+      "count": 2
     },
     {
       "true": "banter",
-      "pred": "hot_take",
+      "pred": "analysis",
+      "count": 2
+    },
+    {
+      "true": "banter",
+      "pred": "reaction",
       "count": 1
     }
   ],
   "accuracy_by_length": [
     {
       "bucket": "short (<80)",
-      "n": 20,
-      "accuracy": 0.45
+      "n": 24,
+      "accuracy": 0.458
     },
     {
       "bucket": "medium (80\u2013200)",
-      "n": 24,
-      "accuracy": 0.625
+      "n": 22,
+      "accuracy": 0.545
     },
     {
       "bucket": "long (>200)",
-      "n": 15,
-      "accuracy": 0.933
+      "n": 11,
+      "accuracy": 0.818
     }
   ]
 }

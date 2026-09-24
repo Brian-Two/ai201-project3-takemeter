@@ -1,33 +1,42 @@
-# TakeMeter — r/nba discourse classifier
+# TakeMeter: r/nba discourse classifier
 
 A fine-tuned DistilBERT model that labels r/nba comments as **`analysis`**, **`hot_take`**, **`reaction`**, or **`banter`**, compared against a zero-shot LLM baseline on the same held-out test set.
 
 - **Demo video:** _TODO: add link (3–5 min)_. Script: [`docs/demo_script.md`](docs/demo_script.md)
-- **Labeled dataset:** [`data/takemeter_final.csv`](data/takemeter_final.csv) (389 examples) · full annotation file with skips, notes and provenance: [`data/takemeter_labeled.csv`](data/takemeter_labeled.csv)
+- **Labeled dataset:** [`data/takemeter_final.csv`](data/takemeter_final.csv) (375 examples) · full annotation file with skips, notes, reviewer status and provenance: [`data/takemeter_labeled.csv`](data/takemeter_labeled.csv)
 - **Planning doc:** [`planning.md`](planning.md) · **Raw metrics:** [`outputs/evaluation_results.json`](outputs/evaluation_results.json)
 
 ## Results at a glance
 
-Test set: 59 held-out comments (stratified 15% split, never used for training or model selection).
+Test set: 57 held-out comments (stratified 15% split, never used for training or model selection).
 
 | Model | Accuracy | Macro F1 | `analysis` F1 | `hot_take` F1 | `reaction` F1 | `banter` F1 |
 |---|---|---|---|---|---|---|
-| Majority class (always `hot_take`) | 0.475 | 0.161 | 0 | 0.64 | 0 | 0 |
-| Zero-shot baseline (Groq `openai/gpt-oss-20b`) | 0.627 | 0.565 | 0.47 | 0.71 | **0.50** | **0.58** |
-| **Fine-tuned DistilBERT** | **0.644** | **0.596** | **0.86** | **0.75** | 0.21 | 0.56 |
+| Majority class (always `hot_take`) | 0.456 | 0.157 | 0 | 0.63 | 0 | 0 |
+| **Zero-shot baseline** (Groq `openai/gpt-oss-20b`) | **0.684** | **0.605** | 0.17 | **0.75** | **0.83** | **0.67** |
+| Fine-tuned DistilBERT | 0.561 | 0.557 | **0.70** | 0.60 | 0.50 | 0.44 |
 
-**Headline:** fine-tuning roughly matches the zero-shot LLM overall. It's one more correct test example, which is within noise at n=59. But the two models are good at different things. The fine-tuned model is far better at spotting **`analysis`** (F1 0.86 vs 0.47, precision 0.82). It's much worse at telling **`reaction`** from **`banter`**, because it mostly learned post *length and specificity*, not *purpose*. See the [reflection](#reflection-what-the-model-learned-vs-what-i-intended).
+**Headline:** the zero-shot LLM beats the fine-tuned model overall, by 7 test examples in accuracy and 4.8 points of macro-F1. The fine-tuned model wins decisively on exactly one class, and it's the one the tool exists for:
+- On **`analysis`**, the fine-tuned model scores F1 0.70 versus 0.17. The LLM almost never says `analysis`: it caught 1 of 11 and called the other 10 `hot_take`.
+- The LLM is better at everything that depends on reading tone.
+- The fine-tuned model learned mostly **length and specificity**, and confuses short `hot_take`s with `banter`. See the [reflection](#reflection-what-the-model-learned-vs-what-i-intended).
 
 **Against the success criteria set in `planning.md` before any data was collected:**
 
 | Criterion (planning.md §6) | Result | Met? |
 |---|---|---|
-| Macro-F1 ≥ 0.60 | 0.596 | ✗ (just missed) |
-| No class F1 below 0.45 | `reaction` = 0.21 | ✗ |
-| Beat baseline by ≥ 5 pts macro-F1 | +3.1 pts | ✗ |
-| `analysis` precision ≥ 0.70 | 0.82 | ✓ |
+| Macro-F1 ≥ 0.60 | 0.557 | ✗ |
+| No class F1 below 0.45 | `banter` = 0.44 | ✗ (just missed) |
+| Beat baseline by ≥ 5 pts macro-F1 | −4.8 pts | ✗ |
+| `analysis` precision ≥ 0.70 | 0.67 | ✗ (just missed) |
 
-So the "show me the analysis comments" use case described in `planning.md` works. A general-purpose four-way classifier does not.
+None of the four thresholds is met.
+
+**How stable is that verdict? Not very, and that's a finding too.** Before the human label review, the same pipeline on a different random 59-post test split gave the *opposite* overall result: fine-tuned 0.644 accuracy / 0.596 macro-F1 versus baseline 0.627 / 0.565. That earlier version is in the commit history.
+
+With about 57 test posts, each post is worth about 1.8 points of accuracy, so "which model wins overall" flips depending on which posts land in the test set. What held up in **both** runs is the per-class pattern:
+- fine-tuned `analysis` F1 was 0.86 and 0.70, against the baseline's 0.47 and 0.17;
+- the LLM was better at `reaction` and `banter` both times.
 
 ---
 
@@ -72,69 +81,78 @@ Each label answers a different question about the comment's **purpose**:
 
    _This length filtering turned out to matter; see [Reflection](#reflection-what-the-model-learned-vs-what-i-intended)._
 
-**Labeling process:**
-- Labels were first assigned by Claude (AI pre-labeling, disclosed in [AI usage](#ai-usage)). Every comment was read in full against the definitions and rules A–C.
-- The annotator wrote a note on any case that needed a rule to resolve; there are 40 notes in the `notes` column.
-- Each row's `annotator` column records whether it's an AI pre-label, a human-confirmed label, or a human correction. `python scripts/label.py --review` steps through the pre-labels for human review.
-- **Review triage.** A second, independent annotator (the zero-shot Groq model, same definitions) labeled all 389 posts; see [Annotator agreement](#annotator-agreement-stretch-model-vs-model). The 142 posts where the two disagree are the review queue: `python scripts/label.py --review --disagreements`. Posts where both annotators agree (247) are more likely correct, but they are still AI labels, not human-verified.
-- 83 of 472 comments (17.6%) were skipped as out of scope. That's higher than the ~10% estimated in `planning.md`, mainly because of user-vs-user insult chains in discussion threads.
+**Labeling process (three passes):**
+1. **AI pre-labels.** Claude read all 472 comments against the definitions and rules A–C, assigned a label or marked a post out of scope, and wrote a note on the 40 cases that needed a rule to resolve. This is disclosed in [AI usage](#ai-usage).
+2. **Independent second annotator.** A different model, zero-shot `openai/gpt-oss-20b` with the same definitions ([`scripts/second_annotator.py`](scripts/second_annotator.py)), labeled all 389 in-scope posts. It disagreed with the pre-label on **142** of them.
+3. **Human review of every disputed label.** I reviewed all 142 disagreements with `python scripts/label.py --review --disagreements`, which shows the post, the current label and the second annotator's label, and judged each against the written definitions:
+   - **kept** the pre-label on 104;
+   - **changed** 38: 14 to the second annotator's label, 10 to a third label, and 14 to out of scope.
 
-**Label distribution (389 usable examples):**
+The `annotator` column records each row's status. **128 of the 375 final labels are human-reviewed** (`human-reviewed` or `human-corrected`). The other **247 are AI labels on which both models independently agreed**, and weren't individually reviewed.
+
+In total 97 of 472 comments (20.6%) are out of scope. That's higher than the ~10% estimated in `planning.md`, mainly because of user-vs-user insult chains in discussion threads.
+
+**Label distribution (375 usable examples):**
 
 | Label | Count | % |
 |---|---|---|
-| hot_take | 182 | 46.8% |
-| banter | 90 | 23.1% |
-| analysis | 66 | 17.0% |
-| reaction | 51 | 13.1% |
-| **Total** | **389** | 100% |
+| hot_take | 174 | 46.4% |
+| banter | 88 | 23.5% |
+| analysis | 71 | 18.9% |
+| reaction | 42 | 11.2% |
+| **Total** | **375** | 100% |
 
-No label is above 70%. `analysis` and `reaction` stayed below the recommended 20% even after the top-ups, because the `reaction` top-up mostly surfaced more `hot_take` and `banter`. This imbalance is handled in training with class weights (below).
+No label is above 70%. `analysis` and `reaction` are below the recommended 20%; this is handled in training with class weights (below).
 
-**Split** ([`data/splits/`](data/splits)): stratified 70/15/15 with seed 42, giving 272 train, 58 validation and 59 test. The baseline and the fine-tuned model are scored on the identical `test.csv`.
+**Split** ([`data/splits/`](data/splits)): stratified 70/15/15 with seed 42, giving 262 train, 56 validation and 57 test. The baseline and the fine-tuned model are scored on the identical `test.csv`.
 
 ### Difficult-to-label examples
 
 1. **"[r-slur] rule. Average all star player play sth like 60 games. So if you are going to set a rule, make it meaningful stats wise. If average of your top 24 player is around 62 games then minimum threshold should be somewhere like 50-55 games…"**
-   - *Could be:* `hot_take`, since the tone is pure outrage and it opens with a slur, or `analysis`.
-   - *Decided:* **`analysis`**. By rule A, strip the anger and a real argument is left: the threshold should sit just below the typical games played by top players, backed by a specific number. The lesson is that tone doesn't decide the label; the structure of the argument does.
+   - *Three annotators, three different labels:*
+     - the AI pre-label said **`analysis`**: strip the anger and a real argument backed by a number remains, which is rule A;
+     - the second annotator said **`hot_take`**, anchoring on the outraged voice;
+     - on review I labeled it **`reaction`**. The case for that label: the post opens with a slur and is mostly venting at the 65-game rule, and its numbers are rough guesses ("sth like 60games") rather than checkable evidence.
+   - *Final:* **`reaction`**. The example shows that rule A breaks down when a rant contains approximate numbers.
 2. **"Embiid is a fucking warrior."** (on news that Embiid would play through injury)
    - *Could be:* `hot_take` (a general claim about his character) or `reaction`.
-   - *Decided:* **`reaction`**. By rule B, this is praise for *this* decision in *this* moment, not a claim anyone would still be debating next week. The same words in a "who's the toughest player in the league" thread would be a `hot_take`.
+   - *Decided:* **`reaction`**; confirmed on review. By rule B, it praises *this* decision in *this* moment, not a claim anyone would still be debating next week. The same words in a "who's the toughest player in the league" thread would be a `hot_take`. The fine-tuned model got it wrong (error table, #17).
 3. **"if ant went for 40 in both games shooting a combined 64% while devin booker shot a tour date in one game and missed the other, surely the wolves won those games right?"**
    - *Could be:* `analysis` (real stats making a real point) or `banter`.
-   - *Decided:* **`banter`**. By rule C, the literal text is sarcasm, and the point (individual stats don't decide games) has to be inferred. This is the case the taxonomy handles worst: the post is funny *and* makes an argument.
-4. **A long nostalgic memory:** "I remember a late-night game at Sacramento in March of '19 where he went nuclear in the 4th quarter and led them back from 25 down, with Atkinson going with DLo, Kurucs, Treveon Graham, Dudley and RHJ the whole quarter…"
-   - *Could be:* `analysis`, because it's packed with specifics.
-   - *Decided:* **`reaction`**. The specifics don't support any claim; the purpose is fond memory. The fine-tuned model got this one wrong in exactly the way the decision predicts (error 1 below).
+   - *Decided:* **`banter`**; confirmed on review. By rule C, the literal text is sarcasm, and the point (individual stats don't decide games) has to be inferred. This is the case the taxonomy handles worst: the post is funny *and* makes an argument.
+4. **"Fox went nuclear and the blazers couldn't stop turning the ball over."**
+   - *Could be:* `reaction` (short, excited) or `analysis`.
+   - *Decided:* **`analysis`**; confirmed on review. It explains a result with two concrete game events, which is the minimum rule A allows. It's also one of the shortest `analysis` posts in the data, which is exactly the kind the fine-tuned model struggles with.
 
 ## Fine-tuning
 
 - **Base model:** `distilbert-base-uncased` (66M parameters) with a 4-way classification head.
 - **Platform:** trained locally on an Apple-silicon MacBook GPU (PyTorch MPS) using Hugging Face `transformers` `Trainer`: [`scripts/train.py`](scripts/train.py). It mirrors the CodePath starter notebook: same model, same 70/15/15 split and the same default hyperparameters, run as a script. Each run takes about 2 minutes.
 - **Setup:** max 256 tokens, AdamW with weight decay 0.01, 10% warmup, evaluation on the validation set after every epoch. The checkpoint with the best **validation** macro-F1 is kept.
-- **Final config:** 8 epochs, learning rate 3e-5, batch size 16, **inverse-frequency class weights** in the loss. The best checkpoint was at epoch 4.
+- **Final config:** 8 epochs, learning rate 3e-5, batch size 16, **inverse-frequency class weights** in the loss (`analysis` 1.31, `hot_take` 0.54, `reaction` 2.26, `banter` 1.07). The best checkpoint was at epoch 4.
 
 ### Key hyperparameter decisions
 
-All configs were compared on the 58-example **validation** set only; the test set was scored once at the end. Full log: [`outputs/hparam_runs.json`](outputs/hparam_runs.json).
+All configs were compared on the 56-example **validation** set only; the test set was scored once at the end. Full per-epoch log: [`outputs/hparam_runs.json`](outputs/hparam_runs.json).
 
-| Config | Class weights | Best val macro-F1 | Best epoch | What happened |
+| Config | Class weights | Best val macro-F1 | Best epoch | Val loss: best epoch → last epoch |
 |---|---|---|---|---|
 | 3 epochs, lr 2e-5, bs 16 (notebook default) | no | 0.159 | — | Predicted `hot_take` for every post |
-| 8 epochs, lr 3e-5, bs 16 | no | 0.444 | 8 | Learns, but minority classes lag |
-| **8 epochs, lr 3e-5, bs 16** | **yes** | **0.529** | **4** | **Chosen**: best epoch = lowest val loss (1.03) |
-| 10 epochs, lr 5e-5, bs 16 | yes | 0.545 | 9 | Val loss rose 1.02 → 1.87; overconfident |
-| 8 epochs, lr 3e-5, bs 8 | yes | 0.509 | 2 | Peaked early, then degraded |
-| 12 epochs, lr 2e-5, bs 8 | yes | 0.531 | 5 | Similar, slower |
+| 8 epochs, lr 3e-5, bs 16 | no | 0.486 | 4 | 0.97 → 1.02 |
+| **8 epochs, lr 3e-5, bs 16** | **yes** | **0.581** | **4** | **1.02 → 1.09 (chosen)** |
+| 10 epochs, lr 5e-5, bs 16 | yes | 0.561 | 3 | 1.03 → 2.03 |
+| 8 epochs, lr 3e-5, bs 8 | yes | 0.557 | 2 | 1.08 → 1.62 |
+| 12 epochs, lr 2e-5, bs 8 | yes | 0.542 | 3 | 1.07 → 1.92 |
 
-1. **More epochs than the default.** With 272 training examples at batch size 16, 3 epochs is only 51 gradient updates. At that point the model had only learned the class prior: validation accuracy was 0.466, exactly the `hot_take` share, and macro-F1 was 0.16. Accuracy alone would have hidden this, which is why `planning.md` made macro-F1 the primary metric.
-2. **Class weights.** At identical settings, weighting the loss by inverse class frequency raised validation macro-F1 from 0.44 to 0.53. Without the weights, the 47% `hot_take` class pulled predictions toward itself.
-3. **Picking the second-best config on purpose.** The 10-epoch, lr 5e-5 run had the highest validation macro-F1 (0.545), but its validation loss climbed from 1.02 to 1.87 while macro-F1 bounced around. It was memorizing the training set and becoming confidently wrong. The chosen run's best checkpoint sits at its lowest validation loss. The 0.016 macro-F1 gap is less than one validation example, so I preferred the better-calibrated model.
+1. **More epochs than the default.** With 262 training examples at batch size 16, 3 epochs is only about 50 gradient updates. At that point the model had only learned the class prior: validation accuracy was 0.464, exactly the `hot_take` share, and macro-F1 was 0.16. Accuracy alone would have hidden this, which is why `planning.md` made macro-F1 the primary metric.
+2. **Class weights.** At identical settings, weighting the loss by inverse class frequency raised validation macro-F1 from 0.49 to 0.58. `reaction` is only 11% of the training data; without weights it was rarely predicted.
+3. **A moderate learning rate and batch size 16, with the best checkpoint where validation loss is lowest.** Every higher-learning-rate or smaller-batch run peaked by epoch 2–3 and then its validation loss exploded (to 1.6–2.0): it was memorizing 262 examples and becoming confidently wrong. The chosen run's best macro-F1 comes at its lowest-validation-loss epoch, and it stays stable afterwards.
+
+The same config also won on the pre-review dataset, where I chose it over a run with a 0.016 higher score because of the same overfitting signal. On the corrected data it wins outright.
 
 ## Baseline
 
-**Approach:** zero-shot classification with an LLM on Groq, no examples or training. Temperature 0, one API call per test comment, same 59-comment `test.csv`. Script: [`scripts/baseline_groq.py`](scripts/baseline_groq.py). Raw responses: [`outputs/baseline_test_predictions.csv`](outputs/baseline_test_predictions.csv).
+**Approach:** zero-shot classification with an LLM on Groq, no examples or training. Temperature 0, one API call per test comment, same 57-comment `test.csv`. Script: [`scripts/baseline_groq.py`](scripts/baseline_groq.py). Raw responses: [`outputs/baseline_test_predictions.csv`](outputs/baseline_test_predictions.csv).
 
 **Model substitution.** The assignment specifies `meta-llama/llama-4-scout-17b-16e-instruct`, but Groq has retired it. It no longer appears in `/v1/models`, and requests return `model_not_found`. I used **`openai/gpt-oss-20b`**, the closest general-purpose open-weights model still offered, with `reasoning_effort: low` because it's a reasoning model.
 
@@ -158,28 +176,30 @@ Decision rules for hard cases:
 Respond with exactly one word: analysis, hot_take, reaction, or banter. No punctuation, no explanation.
 ```
 
-**Parsing:** a response counts only if it is exactly one label name, or contains exactly one label name. Anything else would count as wrong. All 59 responses parsed cleanly (0 unparseable).
+**Parsing:** a response counts only if it is exactly one label name, or contains exactly one label name. Anything else would count as wrong. All 57 responses parsed cleanly (0 unparseable).
+
+**A caveat on fairness.** The same model was also the second annotator, and 14 of the 38 human corrections moved a label *to* its answer. Corrections were made against the written definitions, and 104 of 142 disputes were resolved *against* it. Still, only 19 of the 57 test posts were human-reviewed; the rest carry labels both models agreed on. Both facts slightly favor the baseline on this test set.
 
 ## Evaluation report
 
-### Per-class metrics (test set, n = 59)
+### Per-class metrics (test set, n = 57)
 
 | Label | Support | Baseline P | Baseline R | Baseline F1 | Fine-tuned P | Fine-tuned R | Fine-tuned F1 |
 |---|---|---|---|---|---|---|---|
-| analysis | 10 | 0.57 | 0.40 | 0.47 | **0.82** | **0.90** | **0.86** |
-| hot_take | 28 | 0.62 | **0.82** | 0.71 | **0.80** | 0.71 | **0.75** |
-| reaction | 7 | **0.60** | **0.43** | **0.50** | 0.17 | 0.29 | 0.21 |
-| banter | 14 | **0.70** | 0.50 | **0.58** | 0.64 | 0.50 | 0.56 |
-| **macro avg** | 59 | 0.62 | 0.54 | 0.57 | 0.61 | 0.60 | **0.60** |
+| analysis | 11 | **1.00** | 0.09 | 0.17 | 0.67 | **0.73** | **0.70** |
+| hot_take | 26 | 0.60 | **1.00** | **0.75** | **0.67** | 0.54 | 0.60 |
+| reaction | 6 | **0.83** | **0.83** | **0.83** | 0.50 | 0.50 | 0.50 |
+| banter | 14 | **1.00** | 0.50 | **0.67** | 0.39 | 0.50 | 0.44 |
+| **macro avg** | 57 | 0.86 | 0.61 | **0.61** | 0.56 | 0.57 | 0.56 |
 
 ### Confusion matrix: fine-tuned DistilBERT (rows = true label, columns = predicted)
 
 | true \ pred | analysis | hot_take | reaction | banter | total |
 |---|---|---|---|---|---|
-| **analysis** | **9** | 1 | 0 | 0 | 10 |
-| **hot_take** | 1 | **20** | 4 | 3 | 28 |
-| **reaction** | 1 | 3 | **2** | 1 | 7 |
-| **banter** | 0 | 1 | 6 | **7** | 14 |
+| **analysis** | **8** | 3 | 0 | 0 | 11 |
+| **hot_take** | 2 | **14** | 2 | 8 | 26 |
+| **reaction** | 0 | 0 | **3** | 3 | 6 |
+| **banter** | 2 | 4 | 1 | **7** | 14 |
 
 Image copy: [`outputs/confusion_matrix.png`](outputs/confusion_matrix.png)
 
@@ -187,101 +207,116 @@ Image copy: [`outputs/confusion_matrix.png`](outputs/confusion_matrix.png)
 
 | true \ pred | analysis | hot_take | reaction | banter | total |
 |---|---|---|---|---|---|
-| **analysis** | **4** | 6 | 0 | 0 | 10 |
-| **hot_take** | 3 | **23** | 1 | 1 | 28 |
-| **reaction** | 0 | 2 | **3** | 2 | 7 |
+| **analysis** | **1** | 10 | 0 | 0 | 11 |
+| **hot_take** | 0 | **26** | 0 | 0 | 26 |
+| **reaction** | 0 | 1 | **5** | 0 | 6 |
 | **banter** | 0 | 6 | 1 | **7** | 14 |
 
 **How to read the two matrices:**
-- The **baseline's** errors mostly flow *into* `hot_take`. It called 6 of 10 `analysis` posts and 6 of 14 `banter` posts `hot_take`. It treats anything opinionated as a take and underrates evidence.
-- The **fine-tuned model's** errors are concentrated in the short, casual corner: `banter` → `reaction` (6) and `hot_take` → `reaction` (4). It over-predicts `reaction` (12 predictions for 7 true examples), and only 2 of those 12 are right.
+- **The baseline has one failure mode: everything uncertain becomes `hot_take`.** It predicted `hot_take` 43 times for 26 real ones. That's why its `hot_take` recall is a perfect 1.00 while `analysis` recall is 0.09. When it does say `analysis` or `banter` it's always right (precision 1.00), but it almost never commits.
+- **The fine-tuned model's errors are spread out, with one dominant cell: true `hot_take` predicted as `banter` (8).** Together with `banter` → `hot_take` (4), the `hot_take`↔`banter` boundary accounts for **12 of its 25 errors**.
 
 ### Wrong predictions, analyzed
 
-**1. True `reaction` → predicted `analysis` (confidence 0.76, the model's most confident error)**
-> "I remember a late-night game at Sacramento in March of '19 where he went nuclear in the 4th quarter and led them back from 25 down, with Atkinson going with DLo, Kurucs, Treveon Graham, Dudley and RHJ the whole quarter. RHJ had the most awkward looking game-winning layup…"
+**1. True `hot_take` → predicted `banter` (confidence 0.64), the most common error direction (8 of 25)**
+> "cade is a tier above brunson at this point sorry buddy"
 
-- **What went wrong:** the post has everything the model associates with `analysis`: over 300 characters, a date, a score margin, a coach and five player names. But it argues nothing; it's nostalgia. This is difficult example #4 above, and the label is correct under rule A: specifics that don't support a claim aren't analysis.
-- **Is it a labeling problem?** No. It's a data problem. In training, 68% of `analysis` posts are over 200 characters, against 4% of `reaction` posts. The model learned "long + proper nouns + numbers = analysis."
-- **Fix:** add long `reaction`/`hot_take` posts full of names and numbers, so length and specificity stop predicting the label.
+- **What went wrong:** this is a sincere, confident ranking claim with no evidence, a textbook `hot_take`. But it's 54 characters long, in lowercase, and ends with a teasing "sorry buddy." In the training data, `banter` has a median length of 52 characters and short casual posts are overwhelmingly `banter` or `reaction`. The model reads the *register* (short, slangy, needling), not the *speech act* (a sincere claim).
+- **Is it a labeling problem?** No. Rule C covers this directly: a sincere claim with a jab attached is labeled by the claim. The labels are consistent; the model just can't separate "sincere but casual" from "joking" with 262 examples.
+- **Fix:** more short, casual `hot_take`s in training, which r/nba has plenty of, so shortness stops signaling humor.
 
-**2. True `banter` → predicted `reaction` (confidence 0.42), one of 6 identical-direction errors**
-> "That man is married with 3 kids. He gone gone."
+**2. True `analysis` → predicted `hot_take` (confidence 0.62)**
+> "If you're a second apron team out a bunch of FRPs you are essentially all-in on winning a championship immediately. So no I would not call getting swept or 4-1'd in the CFs a success at all."
 
-- **What went wrong:** it's a joke about a player "leaving" after a trade rumor, and getting it requires knowing the context and reading the deadpan tone. On the surface it's a short, casual, feeling-ish sentence with no argument.
-- **Is it a labeling problem?** Not mainly. In the training data `banter` and `reaction` have almost the same length profile (medians of 54 and 48 characters), and both come mostly from post game and highlight threads. Length and thread vocabulary can't separate them, and 272 examples aren't enough for DistilBERT to learn humor cues. The model's low confidence (0.42) shows it is basically guessing between the two; the second choice was `banter` at 0.36.
-- **Fix:** far more `banter` and `reaction` examples. Alternatively merge them into one `non-argument` label if the tool's purpose is "surface the argued comments."
+- **What went wrong:** the evidence here is *domain knowledge*, not numbers. "Second apron" is the NBA salary-cap tier that restricts trades, and "FRPs" means first-round picks, so the post argues that the cap situation makes anything short of a title a failure. To DistilBERT, "second apron" and "FRPs" are rare tokens it has no basketball meaning for. With no stats and a 190-character body that ends in an opinion ("I would not call … a success"), it looks like a take.
+- **Is it a labeling problem?** No; it's a model-knowledge problem. The same weakness shows up in error #25 ("teams just haven't been guarding him for 3 months").
+- **Fix:** a basketball-aware base model, or many more jargon-based `analysis` examples. The LLM baseline *does* know what a second apron is, but its bias sends nearly all `analysis` to `hot_take` anyway.
 
-**3. True `analysis` → predicted `hot_take` (confidence 0.39)**
-> "Fox went nuclear and the blazers couldn't stop turning the ball over."
+**3. True `hot_take` → predicted `analysis` (confidence 0.69, the model's most confident error)**
+> "I've heard this theory and don't buy it. Let's say an average person shoots on a nerf hoop, same issue, you're too big, ball is too light, you're still making more baskets from 2 feet away than 3 feet, if you took hundreds of shots."
 
-- **What went wrong:** at 69 characters, this is one of the shortest `analysis` posts in the dataset. It explains a result with two concrete game events, so I labeled it `analysis` and noted it as borderline. It's a short explanation, and the model's length prior says short posts aren't analysis.
-- **Is it a labeling problem? Partly yes.** Re-reading similar posts, I labeled a comparable one-line game explanation ("he played like he was crawling through molasses and was given a bunch of open mid range shots…") as `hot_take`. The line between "concrete game event" and "vague impression" wasn't applied consistently for one-sentence posts.
-- **Fix:** tighten rule A for short posts, for example require at least one *checkable* fact such as a number, a named play or a lineup, and relabel the one-sentence cases consistently.
+- **What went wrong:** this *looks* like reasoning: long, structured ("Let's say…"), step by step. But the support is a hypothetical thought experiment, not checkable evidence, so under rule A it's a `hot_take`. The model has learned "long and argumentative" as a proxy for `analysis`, and a proxy can't tell a real argument from a hypothetical one.
+- **Is it a labeling problem?** Borderline. Reasonable annotators could call a well-built thought experiment "tactical detail." It's consistent with the written rule, though, which requires *checkable* evidence.
+- **Fix:** add "argument-shaped" `hot_take`s (hypotheticals, analogies, "imagine if…") to training, and make "checkable" explicit in the definition, for example "a number, a named game or play, or a verifiable fact."
 
 ### Sample classifications (fine-tuned model)
 
 | Post | Predicted | Confidence | True / note |
 |---|---|---|---|
-| "I'm just stating how they can be skewed. Also yes, just 2 years ago the nuggets literally ran Jokic for 80% of his minutes with AT LEAST 3 other starters on the court…" | `analysis` | 0.86 | `analysis` ✓ (test set) |
-| "Just mature. Don't have dumb turnovers, don't think you've won the game before you actually did…" | `hot_take` | 0.65 | `hot_take` ✓ (test set) |
-| "I was so pissed when he hit this shot." | `reaction` | 0.59 | `reaction` ✓ (test set) |
-| "We just call any shot in the 4th quarter a dagger now huh" | `banter` | 0.51 | `banter` ✓ (test set) |
-| "Wemby is already the best defender in the league and it isn't close." | `hot_take` | 0.64 | new post, not in the dataset; `hot_take` ✓ |
-| "If it's the Spurs maybe. Not for OKC though. SGA is the only player on their who's played more than 30 mpg in the last 2 games. They're stupid deep" | `hot_take` | 0.63 | new post, not in the dataset; should be `analysis` ✗ |
+| "I don't hate it for the Bucks because on draft night they have access to 3 picks and a swap, but they won't have any contracts to make trades with. So, if they can't make a trade for a wing…" | `analysis` | 0.80 | `analysis` ✓ (test set) |
+| "Are we pretending that KD is some ball hog? He's always been a team player and is a great playmaker." | `hot_take` | 0.57 | `hot_take` ✓ (test set) |
+| "Caught everyone off guard with that shit. What a fucking dime Good catch and finish from Evan" | `reaction` | 0.54 | `reaction` ✓ (test set) |
+| "Kawhi and a Fistful of dollars" | `banter` | 0.56 | `banter` ✓ (test set) |
+| "Wemby is already the best defender in the league and it isn't close." | `hot_take` | 0.59 | new post, not in the dataset; `hot_take` ✓ |
+| "Grudge avenged!! CHAMPS BABY!" | `banter` | 0.50 | new post; should be `reaction` ✗ (reaction 0.36) |
 
-**Why the first prediction is reasonable:** the Jokic post makes a methodological claim (on/off stats can be skewed by lineup context) and backs it with a specific, checkable fact: Jokic playing about 80% of his minutes alongside three or more starters. With the attitude stripped out ("I'm just stating…"), the argument still stands, which is exactly rule A. It's also long and full of numbers, so it matches the model's surface pattern *and* the intended definition. Confidence is correspondingly high.
+**Why the first prediction is reasonable:** the Bucks post argues that a Ja Morant trade is low-risk for Milwaukee, and every step rests on checkable facts: the Bucks' 3 picks and a swap, their lack of tradeable contracts, and the salaries it lists later (Turner 25m, Kuzma 20m…). Remove the "I don't hate it" framing and the cap logic still holds, which is exactly rule A. It's also long and full of numbers, so the model's surface pattern and the intended definition agree here, which is why this is its most confident correct prediction.
 
-**Why the last one is instructive:** it's a real `analysis` post (a claim supported by a specific minutes stat), but it's only 150 characters and opens with a hedge ("If it's the Spurs maybe"). The model reads it as a take. That's the length shortcut from error 1 in reverse.
+**Why the last one is instructive:** pure celebration is a textbook `reaction`, but it's short, all-caps and exclamatory, which the model associates with `banter`. It split 0.50 / 0.36 between the two, and its low confidence shows it knows it's guessing.
 
 ### Confidence calibration (stretch)
 
 | Confidence | Predictions | Accuracy | Mean confidence |
 |---|---|---|---|
-| < 0.50 | 29 | 0.41 | 0.44 |
-| 0.50–0.70 | 21 | 0.86 | 0.58 |
-| 0.70–0.90 | 9 | 0.89 | 0.79 |
+| < 0.50 | 30 | 0.47 | 0.41 |
+| 0.50–0.70 | 24 | 0.62 | 0.59 |
+| 0.70–0.90 | 3 | 1.00 | 0.76 |
 | ≥ 0.90 | 0 | — | — |
 
-Expected calibration error (4 bins): 0.125.
+Expected calibration error (4 bins): **0.056**.
 
-**The confidence scores are meaningful in *ranking*, but underconfident in absolute terms.**
-- Accuracy doubles from the lowest bin to the middle one (0.41 → 0.86), so a higher score really does mean "more likely right."
-- But predictions in the 0.50–0.70 band are right 86% of the time, which is about 28 points better than their stated confidence.
-- The model never goes above 0.90. That's expected: we picked an early, lowest-validation-loss checkpoint (epoch 4) and trained with class weights, and both make the output probabilities flatter.
-- Nearly half the test set (29 of 59) sits below 0.50. Those are almost all the short `banter`/`reaction`/`hot_take` posts.
-- **In practice:** a community tool could show only predictions above 0.50. That keeps 30 of 59 posts at 87% accuracy.
+**The confidence scores are meaningful.** Accuracy rises steadily with confidence (0.47 → 0.62 → 1.00), and within each bin the stated confidence is close to the actual accuracy (0.41 vs 0.47, 0.59 vs 0.62).
+
+The model is never *very* confident: nothing is above 0.90, and 30 of 57 predictions are below 0.50. That's expected from an early checkpoint (epoch 4) trained with class weights, and honest given the task. The three predictions above 0.70 were all correct, and all three are `analysis` posts.
+
+**In practice:** a community tool should surface only high-confidence `analysis` predictions and leave the rest unlabeled.
 
 ### Error pattern analysis (stretch)
 
 | Length | n | Accuracy |
 |---|---|---|
-| short (< 80 chars) | 20 | 0.45 |
-| medium (80–200) | 24 | 0.62 |
-| long (> 200) | 15 | **0.93** |
+| short (< 80 chars) | 24 | 0.46 |
+| medium (80–200) | 22 | 0.55 |
+| long (> 200) | 11 | **0.82** |
 
-The dominant pattern is **length**. Accuracy on long posts is 93%, against 45% on short ones. **20 of the 21 errors are on posts of 200 characters or fewer.** The second pattern is **`reaction`**: 15 of the 21 errors have `reaction` as either the true or the predicted label (`banter`→`reaction` 6, `hot_take`→`reaction` 4, `reaction`→`hot_take` 3, `reaction`→`analysis` 1, `reaction`→`banter` 1), and 14 of those 15 are short or medium posts. The model hasn't learned what a reaction *is*; it uses `reaction` as the default for "short, no argument, not obviously a joke."
+| true → predicted | count |
+|---|---|
+| hot_take → banter | 8 |
+| banter → hot_take | 4 |
+| analysis → hot_take | 3 |
+| reaction → banter | 3 |
+| hot_take → analysis | 2 |
+| hot_take → reaction | 2 |
+| banter → analysis | 2 |
+| banter → reaction | 1 |
+
+Two patterns explain most errors:
+1. **Length.** Accuracy is 82% on long posts and 46% on short ones.
+2. **The short-casual boundary.** 18 of the 25 errors are confusions among `hot_take`, `banter` and `reaction`; the other 7 involve `analysis`. The model has no reliable way to tell a sincere short opinion from a joke or an outburst: 12 of 25 errors are `hot_take`↔`banter`.
 
 Hypotheses that were tested and **discarded**:
-- **"Profanity pushes posts toward `hot_take`."** Profane test posts were classified *more* accurately (75% vs 63%), and their predictions were spread across labels.
-- **"'lol/lmao' makes the model say `banter`."** Four of the six "lol" posts are truly `hot_take`, and the model mostly predicted `hot_take` for them.
+- **"Profanity pushes posts toward `hot_take`."** Profane test posts have exactly the same accuracy as the rest (0.56), and their predictions are spread across all four labels.
+- **"'lol/lmao' makes the model say `banter`."** Of the three "lol" posts, the model predicted `hot_take` for two.
 
-### Annotator agreement (stretch, model-vs-model)
+### Annotator agreement (stretch, model-vs-model plus human adjudication)
 
-This is **not** the human inter-annotator study the stretch feature describes, since no second person labeled the data. Instead, a second *independent model* labeled all 389 posts with the same definitions and rules ([`scripts/second_annotator.py`](scripts/second_annotator.py), output in [`data/second_annotator.csv`](data/second_annotator.csv)):
-- **primary annotator:** Claude pre-labels;
-- **second annotator:** zero-shot `openai/gpt-oss-20b`.
+This is **not** a full human inter-annotator study, since no second person labeled the data independently. It combines two AI annotators with human adjudication of their disagreements. Scripts and data: [`scripts/second_annotator.py`](scripts/second_annotator.py), [`data/second_annotator.csv`](data/second_annotator.csv).
 
-**Percent agreement 63.5%, Cohen's kappa 0.42** ("moderate" agreement). The two annotators disagree on 142 of 389 posts.
+| Comparison | n | % agreement | Cohen's κ |
+|---|---|---|---|
+| AI pre-labels vs second annotator (`gpt-oss-20b`), before review | 389 | 63.5% | 0.42 |
+| Final labels (after human review) vs second annotator | 375 | 69.6% | 0.52 |
 
-| Primary label | n | Second annotator agrees |
+**On the 142 disputed posts, human review sided with:**
+
+| Outcome | Posts | Share |
 |---|---|---|
-| hot_take | 182 | 86% |
-| reaction | 51 | 49% |
-| banter | 90 | 47% |
-| analysis | 66 | **36%** |
+| The AI pre-label | 104 | 73% |
+| The second annotator | 14 | 10% |
+| Neither: a third label | 10 | 7% |
+| Neither: out of scope | 14 | 10% |
 
-| Primary → second annotator | count |
+| Before review, pre-label → second annotator | count |
 |---|---|
 | analysis → hot_take | 41 |
 | banter → hot_take | 34 |
@@ -293,73 +328,72 @@ This is **not** the human inter-annotator study the stretch feature describes, s
 | other | 8 |
 
 **Where the annotators disagree:**
-- **94 of the 142 disagreements (66%) are the second annotator saying `hot_take`.** It applies rule A much more strictly: 41 of the 66 `analysis` posts become takes for it. It also reads a lot of sarcasm as sincere opinion: 34 `banter` posts become `hot_take`. That's the same bias it showed as the baseline on the test set.
-- **Disagreement is higher on the 40 posts the primary annotator flagged as borderline** (47%, versus 35% on the rest). The boundaries the rules were written for are the ones that are really contested.
-- **The `analysis`↔`hot_take` boundary is the least reliable part of the taxonomy.** Two annotators working from the *same written rule* agree only about a third of the time on what counts as load-bearing evidence. That should be tightened before collecting more data, for example by requiring a checkable fact.
-
-Caveat when reviewing: the second annotator is the same model as the baseline. Changing test-set labels *toward* its answers would inflate the baseline's score, so the review is done against the written definitions, not by deferring to either model.
+- **94 of the 142 disagreements (66%) are the second annotator saying `hot_take`.** That's the same bias it shows as the baseline: 10 of 11 test-set `analysis` posts became `hot_take`.
+- **Disagreement was higher on the 40 posts the pre-labeler flagged as borderline** (47% vs 35%). The boundaries the rules were written for are the ones that are actually contested.
+- **The `analysis`/`hot_take` boundary is the least reliable part of the taxonomy.** Before review, the second annotator agreed with only 36% of `analysis` labels.
 
 ## Reflection: what the model learned vs. what I intended
 
-**I intended** the labels to capture a post's *purpose*: is it arguing with evidence, asserting without it, emoting, or joking? **What the model actually learned** is closer to a *specificity and length detector*.
+**I intended** the labels to capture a post's *purpose*: is it arguing with evidence, asserting without it, emoting, or joking? **What the fine-tuned model actually learned** is closer to a *length and specificity detector*, plus a weak sense of register.
 
-The data shows the shortcut plainly:
+The training data makes the shortcut available:
 
 | Label | Median length | % over 200 chars | % containing a digit |
 |---|---|---|---|
-| analysis | 270 | 68% | 67% |
-| hot_take | 124 | 31% | 34% |
-| banter | 54 | 2% | 26% |
-| reaction | 48 | 4% | 18% |
+| analysis | 239 | 63% | 61% |
+| hot_take | 124 | 30% | 35% |
+| reaction | 50 | 7% | 17% |
+| banter | 52 | 1% | 27% |
 
 The model's decision boundary follows that table:
-- **Long and specific → `analysis`.** This is why `analysis` recall is 0.90 and why the long nostalgic memory (error 1) was confidently called `analysis`.
-- **Medium, confident, no numbers → `hot_take`.** This works well: F1 0.75, beating the baseline.
-- **Short and casual → a coin flip between `reaction` and `banter`,** with `reaction` winning. This is where it falls apart (F1 0.21 and 0.56).
+- **Long, specific and argument-shaped → `analysis`.** This is why it wins `analysis` by a mile (F1 0.70 vs 0.17). It's also why its most confident error is a long hypothetical argument that is really a `hot_take` (error 3), and why jargon-based analysis without numbers gets missed (error 2).
+- **Short and casual → `banter` or `reaction`,** decided almost at random. `reaction` and `banter` have nearly the same length profile (medians 50 and 52 characters), and short sincere `hot_take`s look just like them (error 1). This is where the model loses to the LLM, whose general language understanding reads tone and sarcasm far better (`reaction` F1 0.83, `banter` precision 1.00).
 
-Part of this correlation is real: evidence takes words. **But I made it worse with my own sampling decision.** The top-up batch meant to find more `analysis` kept only comments of 220+ characters, and the one meant to find `reaction` kept only comments of 160 or fewer. That wrote "`analysis` is long, `reaction` is short" into the training data more strongly than it exists in r/nba. It helped the headline `analysis` number and hurt everything that depends on reading tone.
+Part of the length correlation is real: evidence takes words. **But I amplified it with my own sampling decision.** The top-up batch meant to find `analysis` kept only comments of 220+ characters, and the one meant to find `reaction` kept only comments of 160 or fewer. That wrote "`analysis` is long, `reaction` is short" into the data more strongly than it exists in r/nba.
 
-The **zero-shot LLM shows the mirror-image failure.** It understands jokes and feelings better (`reaction` F1 0.50, `banter` precision 0.70). But it treats nearly any opinion as a take: 6 of 10 `analysis` posts became `hot_take`, which suggests it anchors on the confident *voice* of a post rather than checking whether the evidence is load-bearing. Neither model does what rule A actually asks, which is to weigh the evidence.
+**The zero-shot LLM shows the mirror-image failure.** It understands jokes and feelings but treats nearly every opinion-shaped post as a take: 43 `hot_take` predictions for 26 true ones, and 10 of 11 `analysis` posts included. It seems to anchor on the confident *voice* of a post and rarely credits the evidence as load-bearing. **Neither model does what rule A actually asks, which is to weigh whether the evidence carries the claim.** The fine-tuned model counts words and numbers; the LLM listens to tone.
 
 **What would close the gap:**
-1. **Remove the length shortcut from the data.** Add long `hot_take`/`reaction` posts and short `analysis` posts, and sample top-ups by thread type rather than character count.
-2. **Decide whether `reaction` vs `banter` matters for the use case.** For "surface the substantive comments," merging them into one `non-argument` label would likely raise macro-F1 a lot with no loss of usefulness.
-3. **Consider a hybrid.** Use the fine-tuned model for the `analysis` decision, where it's precise and cheap, and the LLM for tone-based labels.
+1. **Break the length shortcut in the data.** Add long `hot_take`s (hypotheticals, rants), short `analysis` posts, and short sincere `hot_take`s. Sample top-ups by thread type, not character count.
+2. **Tighten rule A** so "evidence" means *checkable*: a number, a named game or play, or a cap or contract fact. Hypotheticals and analogies don't count. This is the boundary where all three annotators disagreed most.
+3. **Build a hybrid.** The fine-tuned model is the only one that finds `analysis`, and the LLM is better at tone. A "surface the analysis" tool could use DistilBERT's `analysis` score with a confidence cutoff and let the LLM handle everything else.
+4. **Evaluate more robustly.** With ~57 test posts, the overall winner flipped between two splits. Cross-validation, or a larger test set, is needed before any overall claim.
 
 ## Spec reflection
 
 **How the spec helped.**
-- **Rules A–C made 472 labeling decisions tractable.** Writing them before collecting data meant the hard cases had a pre-committed answer instead of whatever felt right that day. That includes the profane-but-argued rule rant, "Embiid is a warrior," and the sarcastic stat post.
-- **Choosing macro-F1 as the primary metric in advance caught a real problem.** The default training run's 46.6% validation accuracy would have looked plausible on its own; macro-F1 of 0.16 showed immediately that it was predicting a single class.
-- **The pre-set success thresholds kept the write-up honest.** Without them it would have been tempting to call "beats the LLM" a win. With them, it's clear the model met one of four criteria.
+- **Rules A–C made nearly 500 labeling and review decisions tractable.** Writing them *before* collecting data gave every hard case a pre-committed answer. The rules also gave the human review a standard to judge disputes against, instead of picking whichever model sounded right, which is why 104 of 142 disputes went against the second annotator.
+- **Choosing macro-F1 as the primary metric in advance caught a real problem.** The default training run's 46% validation accuracy would have looked plausible on its own; macro-F1 of 0.16 showed it was predicting one class.
+- **The pre-set thresholds kept the write-up honest.** The first run, before review, beat the baseline, and it would have been easy to stop there. With the thresholds and the re-run, it's clear the model meets none of the four criteria overall, and that its real value is narrower: finding `analysis`.
 
 **Where the implementation diverged, and why:**
 1. **Data source.** The plan assumed Reddit's public JSON endpoints, which now block requests without a login, so collection moved to the Arctic Shift archive of the same public comments.
-2. **Out-of-scope rate.** The plan estimated about 10% of posts would be out of scope; it was 17.6%, driven by user-vs-user insult threads.
-3. **Top-up sampling.** The plan said to pull `analysis` from "discussion/stat-heavy threads and longer comments." In practice I filtered by character count for both top-ups. The reflection above shows this introduced a shortcut, so thread-based targeting would have been the better way to follow the plan.
-4. **Baseline model.** Groq retired Llama 4 Scout, so the baseline is `openai/gpt-oss-20b`.
-5. **Training platform.** The model was trained locally with a script that mirrors the Colab notebook, rather than in Colab.
+2. **Out-of-scope rate.** The plan estimated about 10% of posts would be out of scope; it was 20.6%.
+3. **Top-up sampling.** I filtered by character count rather than by thread type, which introduced the length shortcut described above.
+4. **Annotation workflow.** The plan was AI pre-labeling plus a full human review. In practice the human review covered all 142 posts where two independent models disagreed, not all 375.
+5. **Baseline model.** Groq retired Llama 4 Scout, so the baseline is `openai/gpt-oss-20b`.
+6. **Training platform.** The model was trained locally with a script that mirrors the Colab notebook, rather than in Colab.
 
 ## AI usage
 
 This project was built with **Claude Code (Claude Opus 5.5)** as an agent working in this repository, at my direction. Specific instances:
 
 1. **Label pre-annotation (disclosed).**
-   - *What I directed:* have Claude read and pre-label every one of the 472 collected comments, using the definitions and rules A–C from `planning.md`.
-   - *What it produced:* a label per comment, plus a written rationale for the 40 borderline cases (the `notes` column).
-   - *Review and correction:* every row carries `annotator=claude-prelabel` until a human reviews it with `python scripts/label.py --review`. Confirmed rows become `human-reviewed`; changed rows become `human-corrected`, with the original pre-label recorded in `notes`. _Current review status: see the `annotator` column counts in `data/takemeter_labeled.csv`._
-2. **Planning draft, and a correction to it.** Claude drafted `planning.md` after reading about 40 real comments. Its first draft included a `reaction` example that wasn't a real post ("How are the Cavs down 20 again…"). That was replaced with a real comment from a Post Game Thread before the file was committed, because the assignment asks for examples from the community itself.
-3. **Hyperparameter selection: overriding the top score.** The sweep's highest validation macro-F1 was the 10-epoch, lr 5e-5 run. That was overridden in favor of the 8-epoch, lr 3e-5 class-weighted run, because the "winner's" validation loss nearly doubled (overfitting) and the gap was smaller than one validation example.
-4. **Failure analysis: patterns verified or discarded.** Claude proposed four error patterns from the list of misclassified posts: length, `banter`↔`reaction` confusion, profanity, and "lol" markers. Each was checked by counting:
-   - length and `banter`↔`reaction` were **confirmed** (93% vs 45% accuracy by length; 6 of 21 errors in one cell);
+   - *What I directed:* have Claude read and pre-label all 472 collected comments using the definitions and rules A–C from `planning.md`.
+   - *What it produced:* a label per comment, plus written rationales for 40 borderline cases.
+   - *What I changed:* I reviewed every label that a second model disputed (142 posts). I kept 104 and **overrode 38**: 14 to the second model's answer, 10 to a label neither model chose, and 14 to out of scope. For example, I relabeled the "65-game rule" rant from `analysis` to `reaction` (difficult example 1). Rows nobody reviewed keep `annotator=claude-prelabel` (247 of 375), and I don't count agreement between two AIs as human verification.
+2. **Review triage with a second annotator.**
+   - *What I directed:* instead of skimming all 472 posts, have a second model independently label everything and send only the disagreements to me.
+   - *What it produced:* the 142-post review queue and the agreement statistics above.
+   - *Caveat:* that second model is also the baseline, so I judged disputes against the written definitions, not against its answer. See the fairness caveat in [Baseline](#baseline).
+3. **Planning draft, and a correction to it.** Claude drafted `planning.md` after reading about 40 real comments. Its first draft included a `reaction` example that wasn't a real post ("How are the Cavs down 20 again…"). That was replaced with a real comment from a Post Game Thread before the file was committed.
+4. **Hyperparameter selection.** On the pre-review data, the sweep's top validation score came from the 10-epoch, lr 5e-5 run. That was overridden in favor of the 8-epoch, lr 3e-5 class-weighted run, because the "winner's" validation loss nearly doubled (overfitting). On the corrected data the chosen config also wins outright.
+5. **Failure analysis: patterns verified or discarded.** Claude proposed error patterns from the list of misclassified posts: length, confusion between the short casual labels, profanity, and "lol" markers. Each was checked by counting:
+   - length and the `hot_take`↔`banter` confusion were **confirmed**;
    - profanity and "lol" were **discarded** (see Error pattern analysis).
 
-   The length finding also led to checking the *collection* process, which showed that the length-filtered top-ups had amplified the shortcut.
-5. **Review triage with a second annotator.**
-   - *What I directed:* since a full manual pass over 472 posts wasn't feasible, have a second model independently label everything and send only the disagreements to human review.
-   - *What it produced:* 142 disagreement posts plus the agreement statistics above.
-   - *Honesty caveat:* rows that nobody reviewed keep `annotator=claude-prelabel`. Agreement between two AIs is not treated as human verification.
-6. **Baseline substitution.** When the specified Groq model returned `model_not_found`, Claude listed the models available on the account and switched to `openai/gpt-oss-20b`, adding the reasoning-model settings. The change is documented rather than hidden.
+   The length finding also led to checking the *collection* process, which showed that the length-filtered top-ups amplified the shortcut.
+6. **Baseline substitution.** When the specified Groq model returned `model_not_found`, Claude listed the account's available models and switched to `openai/gpt-oss-20b` with reasoning-model settings. The change is documented rather than hidden.
 
 ## Reproduce / run it
 
@@ -370,7 +404,7 @@ cp .env.example .env                                   # add GROQ_API_KEY (never
 
 python scripts/collect_arctic.py --target 400          # collect (optional, data is committed)
 python scripts/second_annotator.py                     # second annotator + agreement stats
-python scripts/label.py --review --disagreements       # review / correct only the disputed labels
+python scripts/label.py --review --disagreements       # human review of disputed labels
 python scripts/stats.py --export                       # distribution checks → data/takemeter_final.csv
 python scripts/train.py --epochs 8 --lr 3e-5 --class-weights --tag e8_lr3e-5_w --final   # train + test eval → model/, outputs/
 python scripts/baseline_groq.py                        # zero-shot baseline on the same test split
@@ -378,15 +412,18 @@ python scripts/analyze.py > outputs/analysis.md        # comparison, calibration
 python app/app.py                                      # demo UI at http://127.0.0.1:7860
 ```
 
-**Deployed interface (stretch):** [`app/app.py`](app/app.py) is a Gradio app. Paste any comment and it shows the predicted label and the confidence for all four classes, with four built-in examples. The trained weights (`model/`, about 255 MB) are too large for git, so the command above rebuilds them in about 2 minutes.
+To regenerate the split after label changes, delete `data/splits/` before running `train.py`.
+
+**Deployed interface (stretch):** [`app/app.py`](app/app.py) is a Gradio app. Paste any comment and it shows the predicted label and the confidence for all four classes, with four built-in examples. The trained weights (`model/`, about 255 MB) are too large for git, so the `train.py` command above rebuilds them in about 2 minutes.
 
 ```
 data/raw_posts.csv            collected comments with provenance (permalink, thread type, batch)
-data/takemeter_labeled.csv    all labels incl. SKIPs, annotator notes, annotator column
-data/takemeter_final.csv      final 389-example dataset (text, label, notes)
+data/takemeter_labeled.csv    all labels incl. SKIPs, notes, annotator status (claude-prelabel / human-reviewed / human-corrected)
+data/second_annotator.csv     independent labels from gpt-oss-20b
+data/takemeter_final.csv      final 375-example dataset (text, label, notes)
 data/splits/                  train / val / test used by both models
 outputs/                      metrics JSON, predictions, confusion_matrix.png, hparam_runs.json, analysis.md
-scripts/                      collect_arctic, import_manual, label, stats, train, baseline_groq, analyze
+scripts/                      collect_arctic, import_manual, second_annotator, label, stats, train, baseline_groq, analyze
 app/app.py                    Gradio demo
 labels.json                   label names + definitions shared by every script
 ```

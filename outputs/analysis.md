@@ -2,96 +2,99 @@
 
 | Model | Accuracy | Macro F1 |
 |---|---|---|
-| Groq zero-shot (gpt-oss-20b) | 0.627 | 0.565 |
-| Fine-tuned DistilBERT | 0.644 | 0.596 |
-| Majority class (always `hot_take`) | 0.475 | — |
+| Groq zero-shot (gpt-oss-20b) | 0.684 | 0.605 |
+| Fine-tuned DistilBERT | 0.561 | 0.557 |
+| Majority class (always `hot_take`) | 0.456 | — |
 
-## Per-class (test set, n=59)
+## Per-class (test set, n=57)
 
 | Label | Support | Baseline P | Baseline R | Baseline F1 | Fine-tuned P | Fine-tuned R | Fine-tuned F1 |
 |---|---|---|---|---|---|---|---|
-| analysis | 10 | 0.57 | 0.40 | 0.47 | 0.82 | 0.90 | 0.86 |
-| hot_take | 28 | 0.62 | 0.82 | 0.71 | 0.80 | 0.71 | 0.75 |
-| reaction | 7 | 0.60 | 0.43 | 0.50 | 0.17 | 0.29 | 0.21 |
-| banter | 14 | 0.70 | 0.50 | 0.58 | 0.64 | 0.50 | 0.56 |
+| analysis | 11 | 1.00 | 0.09 | 0.17 | 0.67 | 0.73 | 0.70 |
+| hot_take | 26 | 0.60 | 1.00 | 0.75 | 0.67 | 0.54 | 0.60 |
+| reaction | 6 | 0.83 | 0.83 | 0.83 | 0.50 | 0.50 | 0.50 |
+| banter | 14 | 1.00 | 0.50 | 0.67 | 0.39 | 0.50 | 0.44 |
 
 ## Confusion matrix — fine-tuned (rows = true, columns = predicted)
 
 | true \ pred | analysis | hot_take | reaction | banter | total |
 |---|---|---|---|---|---|
-| **analysis** | 9 | 1 | 0 | 0 | 10 |
-| **hot_take** | 1 | 20 | 4 | 3 | 28 |
-| **reaction** | 1 | 3 | 2 | 1 | 7 |
-| **banter** | 0 | 1 | 6 | 7 | 14 |
+| **analysis** | 8 | 3 | 0 | 0 | 11 |
+| **hot_take** | 2 | 14 | 2 | 8 | 26 |
+| **reaction** | 0 | 0 | 3 | 3 | 6 |
+| **banter** | 2 | 4 | 1 | 7 | 14 |
 
 ## Confusion matrix — baseline
 
 | true \ pred | analysis | hot_take | reaction | banter | total |
 |---|---|---|---|---|---|
-| **analysis** | 4 | 6 | 0 | 0 | 10 |
-| **hot_take** | 3 | 23 | 1 | 1 | 28 |
-| **reaction** | 0 | 2 | 3 | 2 | 7 |
+| **analysis** | 1 | 10 | 0 | 0 | 11 |
+| **hot_take** | 0 | 26 | 0 | 0 | 26 |
+| **reaction** | 0 | 1 | 5 | 0 | 6 |
 | **banter** | 0 | 6 | 1 | 7 | 14 |
 
 ## Calibration (fine-tuned)
 
 | Confidence | Predictions | Accuracy | Mean confidence |
 |---|---|---|---|
-| < 0.50 | 29 | 0.41 | 0.44 |
-| 0.50–0.70 | 21 | 0.86 | 0.58 |
-| 0.70–0.90 | 9 | 0.89 | 0.79 |
+| < 0.50 | 30 | 0.47 | 0.41 |
+| 0.50–0.70 | 24 | 0.62 | 0.59 |
+| 0.70–0.90 | 3 | 1.00 | 0.76 |
 
-Expected calibration error (4 bins): 0.125
+Expected calibration error (4 bins): 0.056
 
-## Error patterns (21 errors / 59)
+## Error patterns (25 errors / 57)
 
 | true → predicted | count |
 |---|---|
-| banter → reaction | 6 |
-| hot_take → reaction | 4 |
-| reaction → hot_take | 3 |
-| hot_take → banter | 3 |
-| hot_take → analysis | 1 |
-| reaction → analysis | 1 |
-| reaction → banter | 1 |
-| analysis → hot_take | 1 |
-| banter → hot_take | 1 |
+| hot_take → banter | 8 |
+| banter → hot_take | 4 |
+| analysis → hot_take | 3 |
+| reaction → banter | 3 |
+| hot_take → analysis | 2 |
+| hot_take → reaction | 2 |
+| banter → analysis | 2 |
+| banter → reaction | 1 |
 
 | Length | n | Accuracy |
 |---|---|---|
-| short (<80) | 20 | 0.45 |
-| medium (80–200) | 24 | 0.62 |
-| long (>200) | 15 | 0.93 |
+| short (<80) | 24 | 0.46 |
+| medium (80–200) | 22 | 0.55 |
+| long (>200) | 11 | 0.82 |
 
 | Predicted label | times predicted | true count |
 |---|---|---|
-| analysis | 11 | 10 |
-| hot_take | 25 | 28 |
-| reaction | 12 | 7 |
-| banter | 11 | 14 |
+| analysis | 12 | 11 |
+| hot_take | 21 | 26 |
+| reaction | 6 | 6 |
+| banter | 18 | 14 |
 
 ## All fine-tuned errors
 
 | # | true | pred | conf | text |
 |---|---|---|---|---|
-| 1 | banter | reaction | 0.53 | From championship locker room to Ace Ventura sequel. You can't make this shit up. |
-| 2 | reaction | hot_take | 0.58 | It’s pretty cool that the top four First Team are international players. |
-| 3 | banter | reaction | 0.42 | That man is married with 3 kids. He gone gone. |
-| 4 | hot_take | reaction | 0.33 | He folded like a lawn chair during that apology tour after the club incident. You can agree with what he says but it means fuck all if he’s a gigantic pussy |
-| 5 | banter | reaction | 0.50 | Weird how that’s almost exactly like me, except in inches |
-| 6 | reaction | hot_take | 0.52 | It’ll be interesting to see how this new team does against teams that have historically given us trouble. |
-| 7 | hot_take | analysis | 0.48 | Lukas defense has been over hated for a while now cus of the viral lowlights, and on top of that a single guard is never the reason for a teams defensive successes or failures |
-| 8 | reaction | analysis | 0.76 | I remember a late-night game at Sacramento in March of '19 where he went nuclear in the 4th quarter and led them back from 25 down, with Atkinson going with DLo, Kurucs, Treveon Graham, Dudley and RHJ the whole quarter. … |
-| 9 | hot_take | banter | 0.43 | would hate to see where the rockets are without him if he tries to leave this year |
-| 10 | hot_take | reaction | 0.47 | Sucked out the energy of the entire team honestly. Everyone needs to cover for him on defense. |
-| 11 | banter | reaction | 0.43 | No title shot, but glad to see they are at least having fun in south beach |
-| 12 | hot_take | reaction | 0.42 | Real ones will remember he was an X factor during that bucks championship run. Never looked the same after the bubble |
-| 13 | banter | reaction | 0.45 | What were the dinosaurs like, unc? |
-| 14 | reaction | banter | 0.48 | imagine his body develops like Giannis, slow and steady |
-| 15 | hot_take | reaction | 0.43 | Commanders is actually even worse |
-| 16 | analysis | hot_take | 0.39 | Fox went nuclear and the blazers couldn’t stop turning the ball over. |
-| 17 | banter | hot_take | 0.38 | Turns out KAT and Josh Hart are handy players to have available |
-| 18 | hot_take | banter | 0.39 | You could just as easily say that Wemby clearly isn’t in pain lol after a moment he gets up like nothing happened |
-| 19 | hot_take | banter | 0.37 | Better angle for sure. Doesn’t look like a travel there. |
-| 20 | reaction | hot_take | 0.50 | It would've been a nice consolation prize at least, sort of like J-Lin winning a ring with the Raptors after years of injuries. But Dirk and the Mavs dashed those dreams. |
-| 21 | banter | reaction | 0.43 | So he was just hating on the celts. Makes sense. |
+| 1 | banter | reaction | 0.50 | Hell yeah two super bowls already this season |
+| 2 | analysis | hot_take | 0.62 | If you’re a second apron team out a bunch of FRPs you are essentially all-in on winning a championship immediately. So no I would not call getting swept or 4-1’d in the CFs a success at all. |
+| 3 | hot_take | analysis | 0.69 | I’ve heard this theory and don’t buy it. Let’s say an average person shoots on a nerf hoop, same issue, you’re too big, ball is too light, you’re still making more baskets from 2 feet away than 3 feet, if you took hundre… |
+| 4 | hot_take | reaction | 0.37 | Basketball reference is gonna say 82 gp that's literally all that matters |
+| 5 | hot_take | banter | 0.37 | Every game was lost by a basket or two. Yall got swept cause Bron shot like shit |
+| 6 | banter | analysis | 0.28 | Only 1992 more games and he catches Ripkin |
+| 7 | banter | hot_take | 0.41 | Charania is fucking jokić. We know how these "sources" work now. |
+| 8 | hot_take | banter | 0.35 | …from Kings fans who didn’t want to admit their team got fleeced. |
+| 9 | hot_take | banter | 0.64 | cade is a tier above brunson at this point sorry buddy |
+| 10 | hot_take | banter | 0.60 | Garrison Mathew’s is the GOAT at this.Theres a whole compilation on YT of him jumping almost 5 feet forward. |
+| 11 | banter | hot_take | 0.43 | Bro this is an American sports sub. How tough you are depends on the color of your skin. Even if both dudes are from Europe lol |
+| 12 | hot_take | analysis | 0.58 | I’m likely missing something but the simplest solution to these issues imo is just to extend the season in days to eliminate back to backs and allow for more recovery between games. Extend the season two or three or howe… |
+| 13 | analysis | hot_take | 0.45 | Thread from the moment it was signed: https://www.reddit.com/r/nba/comments/1obpo0z/charania_denver_nuggets_guard_christian_braun_has/ Not a single top comment thought it was stupid. |
+| 14 | banter | hot_take | 0.60 | better for the Wolves that Jokic isn't suspended. that's like 50 easy paint points sorted out |
+| 15 | hot_take | banter | 0.35 | and is absolutely nothing like MJ |
+| 16 | banter | hot_take | 0.43 | ykw sure whatever I guess this if fine it’s not like we needed someone who can actually play defense |
+| 17 | reaction | banter | 0.34 | Embiid is a fucking warrior. |
+| 18 | hot_take | banter | 0.60 | he'll get the $44mil max as an RFA...and DET will match |
+| 19 | hot_take | banter | 0.41 | They need to go back to the blue and bronze this bs now has been ugly since day 1 |
+| 20 | banter | analysis | 0.43 | Ok those were his lucky undies. Jokic is officially back. Nuggets in 7 with Jokic averaging 60/30/20 |
+| 21 | hot_take | banter | 0.54 | would hate to see where the rockets are without him if he tries to leave this year |
+| 22 | reaction | banter | 0.40 | Mf broke the 4th Wall on live tv |
+| 23 | reaction | banter | 0.51 | Need to enjoy in the moment |
+| 24 | hot_take | reaction | 0.43 | Chuck is really going through it this season |
+| 25 | analysis | hot_take | 0.44 | Plus forget gabe hes taking laravia's minutes and for the past 3 months teams just havent been guarding him at all so it completely fucks our offense |
