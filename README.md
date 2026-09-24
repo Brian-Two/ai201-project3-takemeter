@@ -76,6 +76,7 @@ Each label answers a different question about the comment's **purpose**:
 - Labels were first assigned by Claude (AI pre-labeling, disclosed in [AI usage](#ai-usage)). Every comment was read in full against the definitions and rules A–C.
 - The annotator wrote a note on any case that needed a rule to resolve; there are 40 notes in the `notes` column.
 - Each row's `annotator` column records whether it's an AI pre-label, a human-confirmed label, or a human correction. `python scripts/label.py --review` steps through the pre-labels for human review.
+- **Review triage.** A second, independent annotator (the zero-shot Groq model, same definitions) labeled all 389 posts; see [Annotator agreement](#annotator-agreement-stretch-model-vs-model). The 142 posts where the two disagree are the review queue: `python scripts/label.py --review --disagreements`. Posts where both annotators agree (247) are more likely correct, but they are still AI labels, not human-verified.
 - 83 of 472 comments (17.6%) were skipped as out of scope. That's higher than the ~10% estimated in `planning.md`, mainly because of user-vs-user insult chains in discussion threads.
 
 **Label distribution (389 usable examples):**
@@ -265,6 +266,39 @@ Hypotheses that were tested and **discarded**:
 - **"Profanity pushes posts toward `hot_take`."** Profane test posts were classified *more* accurately (75% vs 63%), and their predictions were spread across labels.
 - **"'lol/lmao' makes the model say `banter`."** Four of the six "lol" posts are truly `hot_take`, and the model mostly predicted `hot_take` for them.
 
+### Annotator agreement (stretch, model-vs-model)
+
+This is **not** the human inter-annotator study the stretch feature describes, since no second person labeled the data. Instead, a second *independent model* labeled all 389 posts with the same definitions and rules ([`scripts/second_annotator.py`](scripts/second_annotator.py), output in [`data/second_annotator.csv`](data/second_annotator.csv)):
+- **primary annotator:** Claude pre-labels;
+- **second annotator:** zero-shot `openai/gpt-oss-20b`.
+
+**Percent agreement 63.5%, Cohen's kappa 0.42** ("moderate" agreement). The two annotators disagree on 142 of 389 posts.
+
+| Primary label | n | Second annotator agrees |
+|---|---|---|
+| hot_take | 182 | 86% |
+| reaction | 51 | 49% |
+| banter | 90 | 47% |
+| analysis | 66 | **36%** |
+
+| Primary → second annotator | count |
+|---|---|
+| analysis → hot_take | 41 |
+| banter → hot_take | 34 |
+| reaction → hot_take | 19 |
+| banter → reaction | 12 |
+| hot_take → reaction | 11 |
+| hot_take → banter | 10 |
+| reaction → banter | 7 |
+| other | 8 |
+
+**Where the annotators disagree:**
+- **94 of the 142 disagreements (66%) are the second annotator saying `hot_take`.** It applies rule A much more strictly: 41 of the 66 `analysis` posts become takes for it. It also reads a lot of sarcasm as sincere opinion: 34 `banter` posts become `hot_take`. That's the same bias it showed as the baseline on the test set.
+- **Disagreement is higher on the 40 posts the primary annotator flagged as borderline** (47%, versus 35% on the rest). The boundaries the rules were written for are the ones that are really contested.
+- **The `analysis`↔`hot_take` boundary is the least reliable part of the taxonomy.** Two annotators working from the *same written rule* agree only about a third of the time on what counts as load-bearing evidence. That should be tightened before collecting more data, for example by requiring a checkable fact.
+
+Caveat when reviewing: the second annotator is the same model as the baseline. Changing test-set labels *toward* its answers would inflate the baseline's score, so the review is done against the written definitions, not by deferring to either model.
+
 ## Reflection: what the model learned vs. what I intended
 
 **I intended** the labels to capture a post's *purpose*: is it arguing with evidence, asserting without it, emoting, or joking? **What the model actually learned** is closer to a *specificity and length detector*.
@@ -321,7 +355,11 @@ This project was built with **Claude Code (Claude Opus 5.5)** as an agent workin
    - profanity and "lol" were **discarded** (see Error pattern analysis).
 
    The length finding also led to checking the *collection* process, which showed that the length-filtered top-ups had amplified the shortcut.
-5. **Baseline substitution.** When the specified Groq model returned `model_not_found`, Claude listed the models available on the account and switched to `openai/gpt-oss-20b`, adding the reasoning-model settings. The change is documented rather than hidden.
+5. **Review triage with a second annotator.**
+   - *What I directed:* since a full manual pass over 472 posts wasn't feasible, have a second model independently label everything and send only the disagreements to human review.
+   - *What it produced:* 142 disagreement posts plus the agreement statistics above.
+   - *Honesty caveat:* rows that nobody reviewed keep `annotator=claude-prelabel`. Agreement between two AIs is not treated as human verification.
+6. **Baseline substitution.** When the specified Groq model returned `model_not_found`, Claude listed the models available on the account and switched to `openai/gpt-oss-20b`, adding the reasoning-model settings. The change is documented rather than hidden.
 
 ## Reproduce / run it
 
@@ -331,7 +369,8 @@ pip install -r requirements.txt
 cp .env.example .env                                   # add GROQ_API_KEY (never committed)
 
 python scripts/collect_arctic.py --target 400          # collect (optional, data is committed)
-python scripts/label.py --review                       # review / correct labels
+python scripts/second_annotator.py                     # second annotator + agreement stats
+python scripts/label.py --review --disagreements       # review / correct only the disputed labels
 python scripts/stats.py --export                       # distribution checks → data/takemeter_final.csv
 python scripts/train.py --epochs 8 --lr 3e-5 --class-weights --tag e8_lr3e-5_w --final   # train + test eval → model/, outputs/
 python scripts/baseline_groq.py                        # zero-shot baseline on the same test split

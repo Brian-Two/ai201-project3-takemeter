@@ -101,7 +101,8 @@ Status going in: fine-tuned macro-F1 0.596 vs baseline 0.565; `reaction` F1 0.21
 - [x] **Confidence calibration.** Bin test predictions by max softmax probability (<0.5, 0.5–0.7, 0.7–0.9, ≥0.9) and report accuracy and mean confidence per bin, plus expected calibration error. Hypothesis: class weights plus the early (epoch 4) checkpoint make the model *under*confident. Success = accuracy rises monotonically with confidence.
 - [x] **Error pattern analysis.** Group errors by (true → predicted) pair and by post length (<80 / 80–200 / >200 chars). Test four candidate patterns proposed by the AI (length, banter↔reaction, profanity, "lol" markers) and keep only those that hold up in the counts. Also check whether the length-filtered top-up batches created a length/label correlation in the training data.
 - [x] **Deployed interface.** Gradio app (`app/app.py`) loading `./model`, showing label and all four class probabilities, with built-in examples for the demo video.
-- [ ] **Inter-annotator reliability.** Not done: it needs a second human annotator. Plan if added: a friend labels 40 random posts from `data/splits/test.csv` blind, then report Cohen's kappa against the existing labels, with expected disagreement concentrated on reaction↔hot_take (rule B).
+- [x] **Annotator agreement (model-vs-model substitute).** A second model (zero-shot `gpt-oss-20b`, same definitions) labels all 389 posts. Report percent agreement and Cohen's kappa, and break down disagreements by label pair. Also use the disagreements as the human-review queue. This is *not* human inter-annotator reliability, and is reported as such.
+- [ ] **Inter-annotator reliability (human).** Not done: it needs a second human annotator. Plan if added: a friend labels 40 random posts from `data/splits/test.csv` blind, then report Cohen's kappa against the existing labels, with expected disagreement concentrated on reaction↔hot_take (rule B).
 
 ## 9. Revisions After Collection (log)
 
