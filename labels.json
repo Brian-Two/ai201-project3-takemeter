@@ -1,9 +1,9 @@
 {
-  "_comment": "Placeholder labels — replace with your own taxonomy (2–4 labels) once you've read 30–40 real posts. Keys are the labels; values are one-sentence definitions. Order = keyboard shortcut order in scripts/label.py.",
   "subreddit": "nba",
   "labels": {
-    "analysis": "TODO: one-sentence definition",
-    "hot_take": "TODO: one-sentence definition",
-    "reaction": "TODO: one-sentence definition"
+    "analysis": "Makes a basketball claim AND supports it with specific, checkable evidence (stats, concrete game events, tactical detail, or historical comparison) that actually does the reasoning.",
+    "hot_take": "Asserts a confident evaluative opinion about players/teams/the league with no real support, or with support that is vague or purely decorative.",
+    "reaction": "Expresses an in-the-moment feeling (hype, frustration, disbelief, praise) about a specific play, game, or news item without making a broader claim that outlives the moment.",
+    "banter": "Humor is the point: jokes, memes, puns, sarcasm, or riffs where any opinion is only implied and the post is written to be funny rather than to persuade."
   }
 }
